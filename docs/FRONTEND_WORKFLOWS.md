@@ -29,6 +29,7 @@ Muestra antes de firmar:
 - wallet productora;
 - tarifa de Wiker;
 - regla de envio fuera del escrow;
+- clausula de revision logistica;
 - acuerdo de la operacion.
 
 Acciones:

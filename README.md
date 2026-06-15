@@ -29,6 +29,7 @@ revision legal y auditoria.
 - `docs/FRONTEND_WORKFLOWS.md`: acciones y datos requeridos por cada panel.
 - `docs/PRE_REDEPLOY_REVIEW.md`: diferencias pendientes antes del redeploy.
 - `docs/TECHNICAL_DUE_DILIGENCE_QA.md`: respuestas de seguridad y dependencias.
+- `docs/OPERATIONAL_CLAUSES.md`: clausulas operativas para usuarios.
 - `docs/SECURITY.md`: riesgos y controles requeridos.
 - `docs/DEPLOYMENT.md`: simulacion y despliegue en Arbitrum Sepolia.
 - `docs/INERY_INDEXING.md`: esquema y flujo para indexar el protocolo.

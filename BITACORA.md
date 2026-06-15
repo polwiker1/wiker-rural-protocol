@@ -320,3 +320,12 @@
 - El comprador demo recibio 1,000 MockUSDC.
 - Direcciones y transacciones se registraron en
   `deployments/arbitrum-sepolia.md`.
+
+## 2026-06-15 - Clausula de revision logistica
+
+- Se agrego una clausula operativa formal para explicar la revision logistica
+  despues de 21 dias desde `ProductSent`.
+- La clausula aclara que el plazo no libera fondos, no reembolsa, no penaliza,
+  no cancela y no modifica stock automaticamente.
+- El frontend debe mostrar esta clausula antes de que el comprador firme la
+  operacion.

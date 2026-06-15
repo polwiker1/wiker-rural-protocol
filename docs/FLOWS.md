@@ -36,6 +36,9 @@ Comprador paga USDC
   -> 99% productor + 1% tesoreria Wiker
 ```
 
+La clausula de revision logistica queda documentada en
+`docs/OPERATIONAL_CLAUSES.md`.
+
 ## Falta de envio
 
 ```text
