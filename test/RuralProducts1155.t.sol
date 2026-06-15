@@ -32,7 +32,9 @@ contract RuralProducts1155Test is Test {
 
         assertEq(lot.producer, producer);
         assertEq(lot.maxSupply, MAX_SUPPLY);
-        assertEq(lot.allocatedSupply, 0);
+        assertEq(lot.reservedSupply, 0);
+        assertEq(lot.soldSupply, 0);
+        assertEq(lot.retiredSupply, 0);
         assertEq(lot.unitPrice, UNIT_PRICE);
         assertEq(lot.metadataHash, metadataHash);
         assertTrue(lot.active);
@@ -46,7 +48,8 @@ contract RuralProducts1155Test is Test {
 
         RuralProducts1155.Lot memory lot = token.getLot(LOT_ID);
         assertEq(token.balanceOf(buyer, LOT_ID), 20);
-        assertEq(lot.allocatedSupply, 20);
+        assertEq(lot.reservedSupply, 20);
+        assertEq(lot.soldSupply, 0);
         assertEq(token.availableSupply(LOT_ID), 980);
     }
 
@@ -87,16 +90,43 @@ contract RuralProducts1155Test is Test {
         vm.stopPrank();
 
         assertEq(token.balanceOf(buyer, LOT_ID), 0);
+        RuralProducts1155.Lot memory lot = token.getLot(LOT_ID);
+        assertEq(lot.reservedSupply, 0);
+        assertEq(lot.soldSupply, 20);
         assertEq(token.availableSupply(LOT_ID), 980);
     }
 
-    function testUnsuccessfulOrderBurnsAndDoesNotRestoreSupply() public {
+    function testRefundedOrderBurnsAndRestoresAvailableSupply() public {
         vm.startPrank(escrow);
         token.allocateToBuyer(buyer, LOT_ID, 20);
-        token.burnFailed(buyer, LOT_ID, 20);
+        token.burnRefunded(buyer, LOT_ID, 20, true);
         vm.stopPrank();
 
         assertEq(token.balanceOf(buyer, LOT_ID), 0);
+        RuralProducts1155.Lot memory lot = token.getLot(LOT_ID);
+        assertEq(lot.reservedSupply, 0);
+        assertEq(lot.soldSupply, 0);
+        assertEq(token.availableSupply(LOT_ID), MAX_SUPPLY);
+    }
+
+    function testRefundedOrderCanRetireUnrecoveredStock() public {
+        vm.startPrank(escrow);
+        token.allocateToBuyer(buyer, LOT_ID, 20);
+        token.burnRefunded(buyer, LOT_ID, 20, false);
+        vm.stopPrank();
+
+        RuralProducts1155.Lot memory lot = token.getLot(LOT_ID);
+        assertEq(lot.reservedSupply, 0);
+        assertEq(lot.retiredSupply, 20);
         assertEq(token.availableSupply(LOT_ID), 980);
+    }
+
+    function testAdminCanRetireUnavailableStock() public {
+        vm.prank(admin);
+        token.retireAvailableSupply(LOT_ID, 30, keccak256("stock-unavailable"));
+
+        RuralProducts1155.Lot memory lot = token.getLot(LOT_ID);
+        assertEq(lot.retiredSupply, 30);
+        assertEq(token.availableSupply(LOT_ID), 970);
     }
 }

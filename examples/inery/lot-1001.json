@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0.0",
+  "exampleOnly": true,
+  "recordType": "lot",
+  "lotId": "1001",
+  "network": {
+    "name": "arbitrum-sepolia",
+    "chainId": 421614,
+    "ruralProducts1155": "0x91eB43d44E685F3B57229CcFb6eE4dc821550884",
+    "ruralEscrow": "0x3F453F9c0Eae59269e9ED68Ffea1b26683b451F8",
+    "paymentToken": "0xCCD4F95c64A0D9853Be28dAabf0590BAa86c2044"
+  },
+  "producer": {
+    "displayName": "Juan",
+    "wallet": "0x1111111111111111111111111111111111111111",
+    "profileHash": null
+  },
+  "product": {
+    "name": "Miel organica",
+    "description": "Miel organica en frasco de 500 gramos",
+    "unit": {
+      "tokenQuantity": "1",
+      "physicalQuantity": "1",
+      "physicalUnit": "frasco de 500 gramos"
+    }
+  },
+  "stock": {
+    "maxSupply": "1000",
+    "reservedSupply": "0",
+    "soldSupply": "0",
+    "retiredSupply": "0",
+    "availableSupply": "1000"
+  },
+  "pricing": {
+    "unitPriceMinor": "5000000",
+    "unitPriceDisplay": "5.00",
+    "currency": "USDC",
+    "currencyDecimals": 6
+  },
+  "tokenState": {
+    "tokensMintedAtLotCreation": "0",
+    "producerTokenBalance": "0",
+    "rule": "Tokens are minted to buyers on purchase and burned when the order closes"
+  },
+  "integrity": {
+    "metadataHash": "0x83c779460e2f1d9a936f98031f6f24959cc05340e76f079f2c6705044bb4e490",
+    "metadataHashAlgorithm": "keccak256-rfc8785-json",
+    "createdTxHash": null,
+    "createdBlockNumber": null
+  },
+  "status": "active"
+}

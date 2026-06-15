@@ -25,7 +25,8 @@
   tokens se quemen.
 - Un reembolso por incumplimiento quema los tokens y tambien consume
   permanentemente el supply aprobado.
-- El stock nunca se restaura automaticamente.
+- El stock reservado se restaura en reembolsos cuando el producto nunca fue
+  enviado o fue recuperado.
 
 ### Productores y administracion
 
@@ -112,8 +113,9 @@
 - Las transferencias entre usuarios estan bloqueadas.
 - Una venta completada quema tokens sin restaurar stock.
 - La implementacion inicial restauraba stock en un reembolso.
-- Decision corregida antes del escrow: un reembolso tambien consume stock
-  permanentemente.
+- La implementacion inicial hacia consumir stock permanentemente en reembolsos.
+  Esta decision fue reemplazada posteriormente por stock reservado, vendido y
+  retirado.
 - Suite inicial: `15 passed, 0 failed`.
 
 ## 2026-06-14 - RuralEscrow MVP
@@ -126,7 +128,7 @@
 - El comprador tambien firma un importe maximo aceptado para protegerse de
   cambios de precio entre la visualizacion y la ejecucion.
 - Al comprar, el escrow retiene USDC y emite ERC-1155 al comprador.
-- Solo administracion confirma el envio informado por el productor.
+- Solo el verificador operativo confirma el envio informado por el productor.
 - El comprador puede confirmar recepcion y liberar el pago.
 - Administracion puede confirmar entrega y finalizar luego de siete dias sin
   disputa.
@@ -140,3 +142,181 @@
 - La pausa global solo bloquea compras nuevas.
 - Compras, pagos y reembolsos usan `ReentrancyGuard` y `SafeERC20`.
 - Suite actual: `36 passed, 0 failed`.
+
+## 2026-06-15 - Preparacion de despliegue testnet
+
+- Se agrego `DeployRuralProtocolTestnet.s.sol`.
+- El script despliega y conecta el protocolo completo con `MockUSDC`.
+- Registra un productor y lote demostrativos.
+- Emite saldo MockUSDC a un comprador demostrativo.
+- Se agrego prueba integral del flujo de despliegue.
+- Se documento simulacion y broadcast en Arbitrum Sepolia.
+- Suite actual: `37 passed, 0 failed`.
+
+## 2026-06-15 - Despliegue y prueba en Arbitrum Sepolia
+
+- Se simulo y transmitio el despliegue integral en `chainId 421614`.
+- Direcciones y transacciones registradas en
+  `deployments/arbitrum-sepolia.md`.
+- Se ejecuto una compra real de prueba por `20 MockUSDC`.
+- Se confirmo el envio y la recepcion on-chain.
+- La orden finalizo en estado `Completed`.
+- Los ERC-1155 fueron quemados.
+- El stock disponible se redujo de `100` a `98`.
+- El escrow finalizo con saldo `0 MockUSDC`.
+
+## 2026-06-15 - Demostracion con cinco productores
+
+- Se agrego `RunFiveProducerDemo.s.sol` y su prueba integral.
+- Se registraron cinco productores independientes en Arbitrum Sepolia.
+- Se crearon lotes de miel, cafe, trigo, aceite y yerba.
+- Cada productor completo una venta mediante compra, confirmacion de envio y
+  confirmacion de recepcion.
+- Las ordenes `2` a `6` finalizaron en estado `Completed`.
+- Cada productor recibio el `99%` de su venta.
+- La tesoreria recibio un total de `0.93 MockUSDC`.
+- El escrow finalizo con saldo `0 MockUSDC`.
+- Los tokens ERC-1155 de las cinco compras fueron quemados.
+- El stock de cada lote se redujo permanentemente segun la cantidad vendida.
+- Para contabilidad, `maxSupply` representa el stock inicial historico y el
+  modelo local final separa stock reservado, vendido, retirado y disponible.
+- Direcciones, saldos y transacciones quedaron registrados en
+  `deployments/arbitrum-sepolia.md`.
+
+## 2026-06-15 - Modelo de indexacion descentralizada
+
+- Se definio un flujo para indexar eventos confirmados de Arbitrum hacia Inery.
+- Arbitrum y los contratos permanecen como fuente de verdad para stock, pagos y
+  estados.
+- Inery conserva vistas humanas, historicas y consultables.
+- Se definieron colecciones para productores, lotes, ordenes, pagos y eventos.
+- Cada evento se identifica de forma unica por `chainId`, `transactionHash` y
+  `logIndex`.
+- El contenido humano del lote vive off-chain y su `metadataHash` queda anclado
+  en `RuralProducts1155`.
+- Se agregaron ejemplos canonicos para el lote `#1001` y una venta completa.
+
+## 2026-06-15 - Auditoria de fallas y disputas
+
+- Se detecto y corrigio que un envio podia confirmarse despues del plazo de
+  siete dias.
+- Desde el vencimiento exacto solo corresponde revision y reembolso.
+- Se detecto y corrigio que una disputa ganada por el comprador no podia
+  registrar culpa del productor.
+- Las resoluciones para comprador y divididas permiten indicar explicitamente
+  si corresponde penalizacion.
+- La primera culpa confirmada eleva la tarifa futura al `5%`.
+- La segunda culpa confirmada suspende al productor.
+- El administrador puede abrir una disputa por reclamos recibidos fuera del
+  panel, por ejemplo WhatsApp o correo.
+- Se agrego una matriz integral con cinco productores y cinco resoluciones.
+- Queda pendiente definir el plazo maximo para ordenes detenidas en
+  `ProductSent` y si distintos tipos de culpa comparten sanciones.
+
+## 2026-06-15 - Propuesta de ventana logistica
+
+- Se propone conservar `7 dias` desde la compra para confirmar un envio real.
+- Se propone agregar una ventana logistica minima de `21 dias` desde `sentAt`.
+- La ventana de `21 dias` permite intentos de entrega y devolucion al emisor.
+- Vencer la ventana logistica no mueve fondos automaticamente; habilita revision
+  administrativa.
+- Producto incorrecto, calidad discutida, danos y problemas del correo pueden
+  resolverse economicamente, pero no deben generar sanciones automaticas.
+- La falta objetiva propuesta es declarar un envio que no posee aceptacion
+  verificable del correo.
+- Queda por confirmar si no enviar dentro de los primeros `7 dias` continua
+  contando como falta sancionable, como se habia definido anteriormente.
+- Los permisos administrativos se migraran a multisig antes de Arbitrum One.
+
+## 2026-06-15 - Revision funcional previa al redeploy
+
+- Se confirmo que solo no enviar dentro de los 7 dias registra falta del
+  productor.
+- Calidad, producto equivocado, danos y problemas del correo no registran falta
+  automatica.
+- La alerta de 21 dias desde `ProductSent` no mueve fondos automaticamente.
+- El productor carga manualmente empresa de correo, seguimiento, despacho,
+  estado y evidencia desde su panel.
+- Los datos humanos de envio se almacenan en Inery; el contrato conserva su
+  hash.
+- Wiker verifica el envio y el verificador operativo confirma el hash on-chain.
+- Se documentaron botones y vistas para comprador, productor y administracion.
+- Se detecto que el contrato actual todavia permite penalizar desde disputas y
+  conserva una revision de entrega de 7 dias; ambos puntos deben corregirse
+  antes del redeploy.
+- Se detecto que utilizar un unico multisig para confirmar cada envio no escala.
+- Antes del redeploy se recomienda separar gobierno, resoluciones y verificacion
+  operativa mediante roles limitados.
+- Los datos logisticos visibles para comprador y vendedor deben permanecer
+  cifrados o protegidos por permisos en Inery.
+
+## 2026-06-15 - Revision de due diligence tecnica
+
+- Se prepararon respuestas tecnicas sobre dependencias, ataques, disputas y
+  funcionamiento degradado.
+- Se confirmo que el prototipo actual no depende de Chainlink ni IPFS.
+- Si frontend y backend fallan, los contratos y fondos permanecen en Arbitrum,
+  pero las operaciones que requieren evidencia humana pueden quedar detenidas.
+- No se identifico una ruta directa para retirar arbitrariamente fondos del
+  escrow; las resoluciones pagan a comprador, productor y tesoreria registrados.
+- La revision es interna y no reemplaza una auditoria de seguridad externa.
+- Se identifico el agotamiento malicioso de stock en el modelo anterior.
+- Se corrigio localmente separando stock reservado, vendido y retirado; los
+  reembolsos con producto recuperado liberan nuevamente la reserva.
+- Todavia no existe una estimacion defendible del costo minimo para manipular el
+  sistema de forma rentable.
+
+## 2026-06-15 - Correccion del modelo de stock
+
+- Se reemplazo `allocatedSupply` por stock reservado, vendido y retirado.
+- Una compra emite ERC-1155 al comprador y aumenta `reservedSupply`.
+- Una venta completada quema los tokens, reduce la reserva y aumenta
+  `soldSupply`.
+- Un reembolso quema los tokens y libera la reserva cuando el producto nunca fue
+  enviado o fue recuperado.
+- Si un producto no fue recuperado, la resolucion lo mueve a `retiredSupply`.
+- Solo el stock disponible puede retirarse administrativamente y debe incluir un
+  hash de motivo.
+- Se agrego una prueba donde un comprador reserva todo un lote, recibe un
+  reembolso y otro comprador puede adquirir nuevamente el lote completo.
+- No se agregaron limites de compra por wallet ni por orden.
+
+## 2026-06-15 - Arbitraje de devoluciones fisicas
+
+- Se agregaron estados `ReturnApproved` y `ReturnShipped`.
+- Una disputa puede convertirse en devolucion autorizada.
+- El reembolso no se ejecuta hasta que Wiker verifica que el productor recibio
+  el producto devuelto.
+- Hasta entonces, fondos, tokens y stock permanecen reservados.
+- Si el producto devuelto es vendible, el stock vuelve a estar disponible.
+- Si no es vendible, pasa a `retiredSupply`.
+- Si el comprador nunca envia la devolucion, la orden puede resolverse para el
+  productor.
+- Una orden ya completada no puede revertirse porque los fondos dejaron el
+  escrow.
+
+## 2026-06-15 - Bloqueantes previos al redeploy implementados
+
+- Se separaron roles de `governance`, `resolver` y `verifier`.
+- El verificador puede confirmar envios y entregas, pero no mover fondos.
+- El resolutor puede resolver fondos, pero no cambiar configuracion.
+- Gobierno puede rotar resolutor, verificador y tesoreria.
+- Se agrego alerta de revision logistica despues de 21 dias desde `sentAt`, sin
+  movimiento automatico de fondos.
+- Una devolucion aprobada debe despacharse dentro de 7 dias.
+- Una devolucion ya despachada solo puede cerrarse mediante recepcion verificada
+  o arbitraje especifico.
+- El script de despliegue acepta direcciones separadas para gobierno, resolutor,
+  verificador y tesoreria.
+
+## 2026-06-15 - Redeploy con roles separados en Arbitrum Sepolia
+
+- Se simulo y transmitio exitosamente la nueva version en `chainId 421614`.
+- Se asignaron direcciones diferentes para gobierno, resolutor, verificador y
+  tesoreria.
+- Se verificaron on-chain las conexiones entre registro, ERC-1155 y escrow.
+- Se verificaron on-chain los plazos de 7, 21 y 7 dias.
+- El lote demo se creo con 100 unidades disponibles.
+- El comprador demo recibio 1,000 MockUSDC.
+- Direcciones y transacciones se registraron en
+  `deployments/arbitrum-sepolia.md`.

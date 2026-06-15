@@ -25,7 +25,15 @@ revision legal y auditoria.
 - `BITACORA.md`: decisiones confirmadas y cambios del modelo.
 - `docs/ARCHITECTURE.md`: contratos, actores y responsabilidades.
 - `docs/FLOWS.md`: estados y recorridos de lotes y ordenes.
+- `docs/DISPUTE_MATRIX.md`: escenarios, resoluciones y riesgos de disputas.
+- `docs/FRONTEND_WORKFLOWS.md`: acciones y datos requeridos por cada panel.
+- `docs/PRE_REDEPLOY_REVIEW.md`: diferencias pendientes antes del redeploy.
+- `docs/TECHNICAL_DUE_DILIGENCE_QA.md`: respuestas de seguridad y dependencias.
 - `docs/SECURITY.md`: riesgos y controles requeridos.
+- `docs/DEPLOYMENT.md`: simulacion y despliegue en Arbitrum Sepolia.
+- `docs/INERY_INDEXING.md`: esquema y flujo para indexar el protocolo.
+- `deployments/arbitrum-sepolia.md`: direcciones y pruebas on-chain.
+- `examples/inery/`: registros canonicos de lote y orden.
 
 ## Desarrollo
 

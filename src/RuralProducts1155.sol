@@ -10,7 +10,9 @@ contract RuralProducts1155 is ERC1155 {
     struct Lot {
         address producer;
         uint128 maxSupply;
-        uint128 allocatedSupply;
+        uint128 reservedSupply;
+        uint128 soldSupply;
+        uint128 retiredSupply;
         uint128 unitPrice;
         bytes32 metadataHash;
         bool active;
@@ -35,11 +37,13 @@ contract RuralProducts1155 is ERC1155 {
     event LotUnitPriceUpdated(uint256 indexed tokenId, uint128 previousUnitPrice, uint128 newUnitPrice);
     event UnitsAllocated(uint256 indexed tokenId, address indexed buyer, uint256 amount);
     event UnitsCompleted(uint256 indexed tokenId, address indexed buyer, uint256 amount);
-    event UnitsFailed(uint256 indexed tokenId, address indexed buyer, uint256 amount);
+    event UnitsRefunded(uint256 indexed tokenId, address indexed buyer, uint256 amount, bool stockRestored);
+    event UnitsRetired(uint256 indexed tokenId, uint256 amount, bytes32 indexed reasonHash);
 
     error Unauthorized();
     error ZeroAddress();
     error InvalidAmount();
+    error InvalidHash();
     error LotAlreadyExists();
     error LotNotFound();
     error LotNotActive();
@@ -90,7 +94,9 @@ contract RuralProducts1155 is ERC1155 {
         lots[tokenId] = Lot({
             producer: producer,
             maxSupply: maxSupply,
-            allocatedSupply: 0,
+            reservedSupply: 0,
+            soldSupply: 0,
+            retiredSupply: 0,
             unitPrice: unitPrice,
             metadataHash: metadataHash,
             active: true
@@ -127,28 +133,44 @@ contract RuralProducts1155 is ERC1155 {
 
         Lot storage lot = lots[tokenId];
         if (!lot.active) revert LotNotActive();
-        if (uint256(lot.allocatedSupply) + amount > lot.maxSupply) revert SupplyExceeded();
+        if (amount > _availableSupply(lot)) revert SupplyExceeded();
 
-        lot.allocatedSupply += amount.toUint128();
+        lot.reservedSupply += amount.toUint128();
         _mint(buyer, tokenId, amount, "");
         emit UnitsAllocated(tokenId, buyer, amount);
     }
 
     function burnCompleted(address buyer, uint256 tokenId, uint256 amount) external onlyEscrow {
         if (amount == 0) revert InvalidAmount();
+        Lot storage lot = lots[tokenId];
+        lot.reservedSupply -= amount.toUint128();
+        lot.soldSupply += amount.toUint128();
         _burn(buyer, tokenId, amount);
         emit UnitsCompleted(tokenId, buyer, amount);
     }
 
-    function burnFailed(address buyer, uint256 tokenId, uint256 amount) external onlyEscrow {
+    function burnRefunded(address buyer, uint256 tokenId, uint256 amount, bool restoreStock) external onlyEscrow {
         if (amount == 0) revert InvalidAmount();
+        Lot storage lot = lots[tokenId];
+        lot.reservedSupply -= amount.toUint128();
+        if (!restoreStock) lot.retiredSupply += amount.toUint128();
         _burn(buyer, tokenId, amount);
-        emit UnitsFailed(tokenId, buyer, amount);
+        emit UnitsRefunded(tokenId, buyer, amount, restoreStock);
+    }
+
+    function retireAvailableSupply(uint256 tokenId, uint256 amount, bytes32 reasonHash) external onlyAdmin {
+        if (amount == 0) revert InvalidAmount();
+        if (reasonHash == bytes32(0)) revert InvalidHash();
+        _requireLot(tokenId);
+
+        Lot storage lot = lots[tokenId];
+        if (amount > _availableSupply(lot)) revert SupplyExceeded();
+        lot.retiredSupply += amount.toUint128();
+        emit UnitsRetired(tokenId, amount, reasonHash);
     }
 
     function availableSupply(uint256 tokenId) external view returns (uint256) {
-        Lot memory lot = lots[tokenId];
-        return uint256(lot.maxSupply) - uint256(lot.allocatedSupply);
+        return _availableSupply(lots[tokenId]);
     }
 
     function getLot(uint256 tokenId) external view returns (Lot memory) {
@@ -162,5 +184,10 @@ contract RuralProducts1155 is ERC1155 {
 
     function _requireLot(uint256 tokenId) private view {
         if (lots[tokenId].producer == address(0)) revert LotNotFound();
+    }
+
+    function _availableSupply(Lot storage lot) private view returns (uint256) {
+        return
+            uint256(lot.maxSupply) - uint256(lot.reservedSupply) - uint256(lot.soldSupply) - uint256(lot.retiredSupply);
     }
 }

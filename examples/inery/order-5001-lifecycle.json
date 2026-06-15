@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "exampleOnly": true,
+  "recordType": "orderLifecycle",
+  "order": {
+    "orderId": "5001",
+    "lotId": "1001",
+    "producerWallet": "0x1111111111111111111111111111111111111111",
+    "buyerWallet": "0x2222222222222222222222222222222222222222",
+    "quantity": "10",
+    "grossAmountMinor": "50000000",
+    "currency": "USDC",
+    "agreementHash": null,
+    "disputeOpenedBy": null,
+    "shipmentFailureRecorded": false,
+    "stockRestored": false,
+    "status": "completed"
+  },
+  "tokenMovement": {
+    "tokenId": "1001",
+    "mintedToBuyer": "10",
+    "burnedFromBuyer": "10",
+    "buyerFinalBalance": "0"
+  },
+  "stockAfterPurchase": {
+    "maxSupply": "1000",
+    "reservedSupply": "10",
+    "soldSupply": "0",
+    "retiredSupply": "0",
+    "availableSupply": "990"
+  },
+  "settlement": {
+    "producerAmountMinor": "49500000",
+    "treasuryFeeMinor": "500000",
+    "escrowFinalBalanceMinor": "0"
+  },
+  "eventReferences": [
+    {
+      "eventName": "OrderCreated",
+      "eventId": "421614:0x0000000000000000000000000000000000000000000000000000000000000000:0"
+    },
+    {
+      "eventName": "UnitsAllocated",
+      "eventId": "421614:0x0000000000000000000000000000000000000000000000000000000000000000:1"
+    },
+    {
+      "eventName": "ShipmentConfirmed",
+      "eventId": "421614:0x0000000000000000000000000000000000000000000000000000000000000000:2"
+    },
+    {
+      "eventName": "OrderCompleted",
+      "eventId": "421614:0x0000000000000000000000000000000000000000000000000000000000000000:3"
+    },
+    {
+      "eventName": "UnitsCompleted",
+      "eventId": "421614:0x0000000000000000000000000000000000000000000000000000000000000000:4"
+    }
+  ]
+}

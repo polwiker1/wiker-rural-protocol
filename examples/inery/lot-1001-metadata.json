@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0.0",
+  "lotId": "1001",
+  "producer": {
+    "displayName": "Juan",
+    "wallet": "0x1111111111111111111111111111111111111111"
+  },
+  "product": {
+    "name": "Miel organica",
+    "description": "Miel organica en frasco de 500 gramos",
+    "unit": {
+      "tokenQuantity": "1",
+      "physicalQuantity": "1",
+      "physicalUnit": "frasco de 500 gramos"
+    }
+  }
+}

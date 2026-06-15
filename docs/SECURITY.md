@@ -7,21 +7,21 @@
 - Proteger liberaciones y reembolsos con `ReentrancyGuard`.
 - Validar estado, actor, plazo e importe en cada transicion.
 - Una orden completada o reembolsada no puede ejecutarse nuevamente.
-- Una orden reembolsada no restaura stock automaticamente.
+- Una orden reembolsada solo restaura stock cuando el producto fue recuperado o
+  nunca fue enviado.
 - Una disputa bloquea solo su orden.
 - Los tokens ERC-1155 no pueden transferirse entre usuarios.
 - No publicar informacion personal ni codigos de seguimiento on-chain.
 
-## Permisos MVP
+## Permisos
 
-- Una wallet administrativa registra productores y lotes.
+- El gobierno multisig administra productores, lotes, tesoreria y configuracion.
+- El resolutor multisig mueve fondos mediante reembolsos y resoluciones.
+- El verificador operativo confirma envios y entregas, pero no mueve fondos.
 - Solo el escrow autorizado reporta incumplimientos al registro.
 - Solo el escrow autorizado emite y quema tokens vinculados a ordenes.
-- Solo administracion confirma envios, ejecuta reembolsos por falta de envio y
-  resuelve disputas.
-
-Antes de mainnet, los permisos administrativos deben migrarse a multisig y
-procedimientos documentados.
+- Solo el resolutor ejecuta reembolsos y disputas.
+- Solo el verificador confirma envios y entregas.
 
 ## Riesgos a probar
 
@@ -34,6 +34,17 @@ procedimientos documentados.
 - Confirmacion de recepcion por una wallet ajena.
 - Finalizacion de una orden disputada.
 - Suspension incorrecta de productores.
+- Confirmacion de envio despues del plazo.
+- Disputa iniciada por una wallet no autorizada.
+- Resolucion con atribucion incorrecta de culpa al productor.
+- Fondos detenidos indefinidamente en estado `ProductSent`.
+- Clasificacion incorrecta de stock recuperado durante una disputa.
+- Reembolso de devolucion antes de verificar recepcion fisica.
+- Restauracion de stock para un producto devuelto que ya no puede venderse.
+- Comprador autorizado a devolver que nunca despacha el producto.
+- Verificador operativo intentando mover fondos.
+- Resolutor intentando cambiar configuracion.
+- Resolucion general aplicada a una devolucion ya despachada.
 - USDC no estandar o con comportamiento inesperado.
 
 ## Pausa de emergencia futura

@@ -6,7 +6,7 @@ import {ERC1155Holder} from "openzeppelin-contracts/contracts/token/ERC1155/util
 import {ProducerRegistry} from "../src/ProducerRegistry.sol";
 import {RuralProducts1155} from "../src/RuralProducts1155.sol";
 import {RuralEscrow} from "../src/RuralEscrow.sol";
-import {MockUSDC} from "./mocks/MockUSDC.sol";
+import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 
 contract ReentrantBuyer is ERC1155Holder {
     RuralEscrow private immutable escrow;
@@ -65,7 +65,7 @@ contract RuralEscrowTest is Test {
         registry = new ProducerRegistry(admin);
         products = new RuralProducts1155(admin, "https://api.wiker.example/lots/{id}.json");
         usdc = new MockUSDC();
-        escrow = new RuralEscrow(admin, treasury, usdc, registry, products);
+        escrow = new RuralEscrow(admin, admin, admin, treasury, usdc, registry, products);
 
         vm.startPrank(admin);
         registry.setEscrow(address(escrow));
@@ -164,22 +164,17 @@ contract RuralEscrowTest is Test {
         escrow.confirmShipment(orderId, SHIPPING_HASH);
     }
 
-    function testAdminFinalizesSevenDaysAfterConfirmedDelivery() public {
+    function testProductSentRequiresLogisticsReviewAfterTwentyOneDaysWithoutMovingFunds() public {
         uint256 orderId = _purchase();
 
-        vm.startPrank(admin);
+        vm.prank(admin);
         escrow.confirmShipment(orderId, SHIPPING_HASH);
-        escrow.confirmDelivery(orderId);
 
-        vm.expectRevert(RuralEscrow.ReviewPeriodActive.selector);
-        escrow.finalizeAfterDeliveryReview(orderId);
-
-        vm.warp(block.timestamp + 7 days);
-        escrow.finalizeAfterDeliveryReview(orderId);
-        vm.stopPrank();
-
-        assertEq(usdc.balanceOf(producer), 19_800_000);
-        assertEq(usdc.balanceOf(treasury), 200_000);
+        assertFalse(escrow.requiresLogisticsReview(orderId));
+        vm.warp(block.timestamp + escrow.LOGISTICS_REVIEW_PERIOD());
+        assertTrue(escrow.requiresLogisticsReview(orderId));
+        assertEq(usdc.balanceOf(address(escrow)), ORDER_AMOUNT);
+        assertEq(usdc.balanceOf(producer), 0);
     }
 
     function testAdminRefundsFullAmountAfterSevenDaysWithoutShipment() public {
@@ -198,9 +193,30 @@ contract RuralEscrowTest is Test {
         assertEq(usdc.balanceOf(address(escrow)), 0);
         assertEq(uint256(order.status), uint256(RuralEscrow.OrderStatus.Refunded));
         assertEq(products.balanceOf(buyer, LOT_ID), 0);
-        assertEq(products.availableSupply(LOT_ID), MAX_SUPPLY - QUANTITY);
+        assertEq(products.availableSupply(LOT_ID), MAX_SUPPLY);
         assertEq(producerRecord.shipmentFailures, 1);
         assertEq(registry.feeBps(producer), 500);
+    }
+
+    function testRefundedBuyerCannotPermanentlyExhaustLotStock() public {
+        uint128 fullLotAmount = MAX_SUPPLY * UNIT_PRICE;
+        vm.prank(buyer);
+        uint256 orderId = escrow.purchase(LOT_ID, MAX_SUPPLY, fullLotAmount, AGREEMENT_HASH);
+        assertEq(products.availableSupply(LOT_ID), 0);
+
+        vm.warp(block.timestamp + escrow.SHIPMENT_DEADLINE());
+        vm.prank(admin);
+        escrow.refundForNoShipment(orderId, RESOLUTION_HASH);
+        assertEq(products.availableSupply(LOT_ID), MAX_SUPPLY);
+
+        usdc.mint(stranger, fullLotAmount);
+        vm.startPrank(stranger);
+        usdc.approve(address(escrow), fullLotAmount);
+        escrow.purchase(LOT_ID, MAX_SUPPLY, fullLotAmount, keccak256("second-agreement"));
+        vm.stopPrank();
+
+        assertEq(products.availableSupply(LOT_ID), 0);
+        assertEq(products.balanceOf(stranger, LOT_ID), MAX_SUPPLY);
     }
 
     function testCannotRefundBeforeShipmentDeadline() public {
@@ -325,6 +341,7 @@ contract RuralEscrowTest is Test {
         assertEq(usdc.balanceOf(producer), 9_900_000);
         assertEq(usdc.balanceOf(treasury), 100_000);
         assertEq(usdc.balanceOf(address(escrow)), 0);
+        assertEq(products.availableSupply(LOT_ID), MAX_SUPPLY - QUANTITY);
     }
 
     function testEscalatedDisputeCanStillBeResolved() public {
@@ -339,6 +356,128 @@ contract RuralEscrowTest is Test {
         escrow.resolveDisputeForBuyer(orderId, RESOLUTION_HASH);
         vm.stopPrank();
 
+        assertEq(usdc.balanceOf(buyer), 1_000e6);
+    }
+
+    function testBuyerReturnRefundsOnlyAfterProducerReceivesProduct() public {
+        uint256 orderId = _purchase();
+        vm.startPrank(admin);
+        escrow.confirmShipment(orderId, SHIPPING_HASH);
+        escrow.confirmDelivery(orderId);
+        vm.stopPrank();
+        vm.prank(buyer);
+        escrow.openDispute(orderId, DISPUTE_HASH);
+
+        vm.startPrank(admin);
+        escrow.approveReturn(orderId, keccak256("return-approved"));
+        escrow.confirmReturnShipment(orderId, keccak256("return-shipping"));
+        vm.stopPrank();
+
+        assertEq(usdc.balanceOf(buyer), 980e6);
+        assertEq(usdc.balanceOf(address(escrow)), ORDER_AMOUNT);
+        assertEq(products.balanceOf(buyer, LOT_ID), QUANTITY);
+        assertEq(products.availableSupply(LOT_ID), MAX_SUPPLY - QUANTITY);
+
+        vm.prank(admin);
+        escrow.confirmReturnReceivedAndRefund(orderId, keccak256("return-received"), true);
+
+        RuralEscrow.Order memory order = escrow.getOrder(orderId);
+        assertEq(uint256(order.status), uint256(RuralEscrow.OrderStatus.Refunded));
+        assertEq(usdc.balanceOf(buyer), 1_000e6);
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+        assertEq(products.balanceOf(buyer, LOT_ID), 0);
+        assertEq(products.availableSupply(LOT_ID), MAX_SUPPLY);
+    }
+
+    function testApprovedReturnWithoutShipmentKeepsFundsAndStockReserved() public {
+        uint256 orderId = _purchase();
+        vm.prank(admin);
+        escrow.confirmShipment(orderId, SHIPPING_HASH);
+        vm.prank(buyer);
+        escrow.openDispute(orderId, DISPUTE_HASH);
+        vm.prank(admin);
+        escrow.approveReturn(orderId, keccak256("return-approved"));
+
+        vm.prank(admin);
+        vm.expectRevert(RuralEscrow.InvalidStatus.selector);
+        escrow.confirmReturnReceivedAndRefund(orderId, keccak256("not-received"), true);
+
+        assertEq(usdc.balanceOf(address(escrow)), ORDER_AMOUNT);
+        assertEq(products.balanceOf(buyer, LOT_ID), QUANTITY);
+        assertEq(products.availableSupply(LOT_ID), MAX_SUPPLY - QUANTITY);
+    }
+
+    function testApprovedReturnNotShippedCanResolveForProducer() public {
+        uint256 orderId = _purchase();
+        vm.prank(admin);
+        escrow.confirmShipment(orderId, SHIPPING_HASH);
+        vm.prank(buyer);
+        escrow.openDispute(orderId, DISPUTE_HASH);
+
+        vm.startPrank(admin);
+        escrow.approveReturn(orderId, keccak256("return-approved"));
+        vm.warp(block.timestamp + escrow.RETURN_SHIPMENT_DEADLINE());
+        escrow.resolveExpiredReturnForProducer(orderId, keccak256("buyer-never-returned"));
+        vm.stopPrank();
+
+        assertEq(uint256(escrow.getOrder(orderId).status), uint256(RuralEscrow.OrderStatus.Completed));
+        assertEq(usdc.balanceOf(producer), 19_800_000);
+        assertEq(usdc.balanceOf(treasury), 200_000);
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+        assertEq(products.availableSupply(LOT_ID), MAX_SUPPLY - QUANTITY);
+    }
+
+    function testReturnCannotShipAfterDeadline() public {
+        uint256 orderId = _purchase();
+        vm.prank(admin);
+        escrow.confirmShipment(orderId, SHIPPING_HASH);
+        vm.prank(buyer);
+        escrow.openDispute(orderId, DISPUTE_HASH);
+        vm.prank(admin);
+        escrow.approveReturn(orderId, keccak256("return-approved"));
+
+        vm.warp(block.timestamp + escrow.RETURN_SHIPMENT_DEADLINE());
+        vm.prank(admin);
+        vm.expectRevert(RuralEscrow.DeadlineExpired.selector);
+        escrow.confirmReturnShipment(orderId, keccak256("late-return"));
+    }
+
+    function testReturnShippedRequiresSpecificArbitration() public {
+        uint256 orderId = _purchase();
+        vm.prank(admin);
+        escrow.confirmShipment(orderId, SHIPPING_HASH);
+        vm.prank(buyer);
+        escrow.openDispute(orderId, DISPUTE_HASH);
+        vm.startPrank(admin);
+        escrow.approveReturn(orderId, keccak256("return-approved"));
+        escrow.confirmReturnShipment(orderId, keccak256("return-shipped"));
+
+        vm.expectRevert(RuralEscrow.InvalidStatus.selector);
+        escrow.resolveDisputeForProducer(orderId, keccak256("invalid-general-resolution"));
+
+        escrow.resolveReturnShippingDispute(orderId, 10e6, keccak256("return-lost-split"));
+        vm.stopPrank();
+
+        assertEq(uint256(escrow.getOrder(orderId).status), uint256(RuralEscrow.OrderStatus.PartiallyResolved));
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+    }
+
+    function testReturnedDamagedProductIsRefundedButRetiredFromStock() public {
+        uint256 orderId = _purchase();
+        vm.prank(admin);
+        escrow.confirmShipment(orderId, SHIPPING_HASH);
+        vm.prank(buyer);
+        escrow.openDispute(orderId, DISPUTE_HASH);
+
+        vm.startPrank(admin);
+        escrow.approveReturn(orderId, keccak256("return-approved"));
+        escrow.confirmReturnShipment(orderId, keccak256("return-shipping"));
+        escrow.confirmReturnReceivedAndRefund(orderId, keccak256("damaged-return-received"), false);
+        vm.stopPrank();
+
+        RuralProducts1155.Lot memory lot = products.getLot(LOT_ID);
+        assertEq(lot.retiredSupply, QUANTITY);
+        assertEq(products.availableSupply(LOT_ID), MAX_SUPPLY - QUANTITY);
         assertEq(usdc.balanceOf(buyer), 1_000e6);
     }
 
