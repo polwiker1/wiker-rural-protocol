@@ -31,6 +31,7 @@ revision legal y auditoria.
 - `docs/TECHNICAL_DUE_DILIGENCE_QA.md`: respuestas de seguridad y dependencias.
 - `docs/OPERATIONAL_CLAUSES.md`: clausulas operativas para usuarios.
 - `docs/SECURITY.md`: riesgos y controles requeridos.
+- `docs/GAS_ESTIMATES.md`: estimacion de gas operativo del escrow.
 - `docs/DEPLOYMENT.md`: simulacion y despliegue en Arbitrum Sepolia.
 - `docs/INERY_INDEXING.md`: esquema y flujo para indexar el protocolo.
 - `deployments/arbitrum-sepolia.md`: direcciones y pruebas on-chain.
@@ -43,6 +44,10 @@ forge build
 forge test
 forge fmt
 ```
+
+La suite incluye tests unitarios, flujos integrales, matriz de disputas, una
+primera capa de fuzzing para stock, escrow y resoluciones divididas, y pruebas
+locales de carga con muchas wallets comprando el mismo lote.
 
 ## Estado
 

@@ -329,3 +329,33 @@
   no cancela y no modifica stock automaticamente.
 - El frontend debe mostrar esta clausula antes de que el comprador firme la
   operacion.
+
+## 2026-06-16 - Fuzzing inicial de seguridad
+
+- Se agrego `test/RuralProtocolFuzz.t.sol`.
+- Se incorporaron pruebas fuzz para cantidades variables de compra, reembolso
+  por falta de envio, pausa de compras y resolucion dividida de disputa.
+- Las propiedades verificadas cubren consistencia de escrow, stock reservado,
+  stock retirado, tokens ERC-1155 y pagos a comprador, productor y tesoreria.
+- La suite completa queda en `59 passed, 0 failed`.
+
+## 2026-06-16 - Pruebas locales de carga de compras
+
+- Se agrego `test/RuralProtocolLoad.t.sol`.
+- Se simularon 100 wallets comprando el mismo lote sin romper contabilidad de
+  escrow, ordenes, tokens ERC-1155 ni stock reservado.
+- Se simulo agotamiento completo del supply con 100 wallets y se verifico que
+  una compra adicional revierte sin cobrar USDC ni emitir tokens.
+- La prueba representa compras ordenadas por la EVM, no paralelismo real fuera
+  de blockchain.
+- La suite completa queda en `61 passed, 0 failed`.
+
+## 2026-06-16 - Estimacion de gas operativo
+
+- Se ejecuto `forge test --gas-report`.
+- Se documento `docs/GAS_ESTIMATES.md`.
+- Se separo el gas pagado por comprador del gas operativo pagado por Wiker.
+- Las acciones operativas principales del escrow se estiman entre `36k` y
+  `184k` gas segun la funcion.
+- La compra queda del lado del comprador y se observa cerca de `306k` gas
+  tipicos.
