@@ -359,3 +359,15 @@
   `184k` gas segun la funcion.
 - La compra queda del lado del comprador y se observa cerca de `306k` gas
   tipicos.
+
+## 2026-06-16 - Coverage defensivo de RuralEscrow
+
+- Se agrego `test/RuralEscrowNegativeBranches.t.sol`.
+- Se cubrieron ramas negativas de hashes cero, direcciones cero, montos
+  invalidos, estados incorrectos, deadlines y resoluciones de devolucion.
+- `RuralEscrow.sol` subio a:
+  - `97.13%` lineas;
+  - `96.93%` statements;
+  - `95.12%` branches;
+  - `100.00%` funciones.
+- La suite completa queda en `71 passed, 0 failed`.
