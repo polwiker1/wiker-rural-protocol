@@ -113,4 +113,99 @@ contract ProducerRegistryTest is Test {
 
         assertEq(registry.feeBps(producer), 100);
     }
+
+    function testConstructorAndSettersRejectZeroAddresses() public {
+        vm.expectRevert(ProducerRegistry.ZeroAddress.selector);
+        new ProducerRegistry(address(0));
+
+        vm.startPrank(admin);
+        vm.expectRevert(ProducerRegistry.ZeroAddress.selector);
+        registry.setAdmin(address(0));
+
+        vm.expectRevert(ProducerRegistry.ZeroAddress.selector);
+        registry.setEscrow(address(0));
+        vm.stopPrank();
+    }
+
+    function testAdminCanRotateAdminAndEscrow() public {
+        address newAdmin = address(0xA1);
+        address newEscrow = address(0xE1);
+
+        vm.prank(admin);
+        registry.setAdmin(newAdmin);
+        assertEq(registry.admin(), newAdmin);
+
+        vm.prank(newAdmin);
+        registry.setEscrow(newEscrow);
+        assertEq(registry.escrow(), newEscrow);
+    }
+
+    function testRegisterRejectsZeroProducer() public {
+        vm.prank(admin);
+        vm.expectRevert(ProducerRegistry.ZeroAddress.selector);
+        registry.registerProducer(address(0), profileHash);
+    }
+
+    function testRegisteredOnlyFunctionsRejectUnknownProducer() public {
+        vm.startPrank(admin);
+        vm.expectRevert(ProducerRegistry.ProducerNotRegistered.selector);
+        registry.updateProfileHash(producer, keccak256("new-profile"));
+
+        vm.expectRevert(ProducerRegistry.ProducerNotRegistered.selector);
+        registry.suspendProducer(producer);
+
+        vm.expectRevert(ProducerRegistry.ProducerNotRegistered.selector);
+        registry.reactivateProducer(producer);
+
+        vm.expectRevert(ProducerRegistry.ProducerNotRegistered.selector);
+        registry.setProducerFeeBps(producer, 100);
+        vm.stopPrank();
+
+        vm.prank(escrow);
+        vm.expectRevert(ProducerRegistry.ProducerNotRegistered.selector);
+        registry.reportShipmentFailure(producer);
+
+        vm.expectRevert(ProducerRegistry.ProducerNotRegistered.selector);
+        registry.feeBps(producer);
+    }
+
+    function testAdminCanUpdateProfileAndSuspendActiveProducer() public {
+        bytes32 updatedProfileHash = keccak256("updated-profile");
+
+        vm.startPrank(admin);
+        registry.registerProducer(producer, profileHash);
+        registry.updateProfileHash(producer, updatedProfileHash);
+        registry.suspendProducer(producer);
+        vm.stopPrank();
+
+        ProducerRegistry.Producer memory record = registry.getProducer(producer);
+        assertEq(record.profileHash, updatedProfileHash);
+        assertEq(uint256(record.status), uint256(ProducerRegistry.ProducerStatus.Suspended));
+        assertFalse(registry.isActiveProducer(producer));
+    }
+
+    function testInvalidFeeIsRejected() public {
+        vm.startPrank(admin);
+        registry.registerProducer(producer, profileHash);
+
+        vm.expectRevert(ProducerRegistry.InvalidFee.selector);
+        registry.setProducerFeeBps(producer, 10_001);
+        vm.stopPrank();
+    }
+
+    function testRepeatedShipmentFailureKeepsSuspendedProducerSuspended() public {
+        vm.prank(admin);
+        registry.registerProducer(producer, profileHash);
+
+        vm.startPrank(escrow);
+        registry.reportShipmentFailure(producer);
+        registry.reportShipmentFailure(producer);
+        uint32 failures = registry.reportShipmentFailure(producer);
+        vm.stopPrank();
+
+        ProducerRegistry.Producer memory record = registry.getProducer(producer);
+        assertEq(failures, 3);
+        assertEq(record.shipmentFailures, 3);
+        assertEq(uint256(record.status), uint256(ProducerRegistry.ProducerStatus.Suspended));
+    }
 }

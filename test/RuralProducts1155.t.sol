@@ -129,4 +129,155 @@ contract RuralProducts1155Test is Test {
         assertEq(lot.retiredSupply, 30);
         assertEq(token.availableSupply(LOT_ID), 970);
     }
+
+    function testConstructorAndSettersRejectZeroAddresses() public {
+        vm.expectRevert(RuralProducts1155.ZeroAddress.selector);
+        new RuralProducts1155(address(0), "https://api.wiker.example/lots/{id}.json");
+
+        vm.startPrank(admin);
+        vm.expectRevert(RuralProducts1155.ZeroAddress.selector);
+        token.setAdmin(address(0));
+
+        vm.expectRevert(RuralProducts1155.ZeroAddress.selector);
+        token.setEscrow(address(0));
+        vm.stopPrank();
+    }
+
+    function testAdminCanRotateAdminEscrowAndBaseURI() public {
+        address newAdmin = address(0xA1);
+        address newEscrow = address(0xE1);
+
+        vm.startPrank(admin);
+        token.setBaseURI("https://api.wiker.example/v2/{id}.json");
+        token.setAdmin(newAdmin);
+        vm.stopPrank();
+
+        assertEq(token.admin(), newAdmin);
+
+        vm.prank(newAdmin);
+        token.setEscrow(newEscrow);
+        assertEq(token.escrow(), newEscrow);
+    }
+
+    function testCreateLotRejectsInvalidInputsAndDuplicateLot() public {
+        vm.startPrank(admin);
+        vm.expectRevert(RuralProducts1155.ZeroAddress.selector);
+        token.createLot(2, address(0), MAX_SUPPLY, UNIT_PRICE, metadataHash);
+
+        vm.expectRevert(RuralProducts1155.InvalidAmount.selector);
+        token.createLot(2, producer, 0, UNIT_PRICE, metadataHash);
+
+        vm.expectRevert(RuralProducts1155.InvalidAmount.selector);
+        token.createLot(2, producer, MAX_SUPPLY, 0, metadataHash);
+
+        vm.expectRevert(RuralProducts1155.LotAlreadyExists.selector);
+        token.createLot(LOT_ID, producer, MAX_SUPPLY, UNIT_PRICE, metadataHash);
+        vm.stopPrank();
+    }
+
+    function testLotAdminFunctionsRejectMissingLotAndInvalidPrice() public {
+        vm.startPrank(admin);
+        vm.expectRevert(RuralProducts1155.LotNotFound.selector);
+        token.setLotActive(999, false);
+
+        vm.expectRevert(RuralProducts1155.LotNotFound.selector);
+        token.updateMetadataHash(999, keccak256("missing"));
+
+        vm.expectRevert(RuralProducts1155.InvalidAmount.selector);
+        token.updateUnitPrice(LOT_ID, 0);
+
+        vm.expectRevert(RuralProducts1155.LotNotFound.selector);
+        token.updateUnitPrice(999, UNIT_PRICE);
+        vm.stopPrank();
+    }
+
+    function testAdminCanUpdateMetadataAndUnitPrice() public {
+        bytes32 updatedMetadataHash = keccak256("lot-metadata-v2");
+
+        vm.startPrank(admin);
+        token.updateMetadataHash(LOT_ID, updatedMetadataHash);
+        token.updateUnitPrice(LOT_ID, UNIT_PRICE + 1e6);
+        vm.stopPrank();
+
+        RuralProducts1155.Lot memory lot = token.getLot(LOT_ID);
+        assertEq(lot.metadataHash, updatedMetadataHash);
+        assertEq(lot.unitPrice, UNIT_PRICE + 1e6);
+    }
+
+    function testAllocateRejectsInvalidInputsAndMissingLot() public {
+        vm.startPrank(escrow);
+        vm.expectRevert(RuralProducts1155.ZeroAddress.selector);
+        token.allocateToBuyer(address(0), LOT_ID, 1);
+
+        vm.expectRevert(RuralProducts1155.InvalidAmount.selector);
+        token.allocateToBuyer(buyer, LOT_ID, 0);
+
+        vm.expectRevert(RuralProducts1155.LotNotFound.selector);
+        token.allocateToBuyer(buyer, 999, 1);
+        vm.stopPrank();
+    }
+
+    function testBurnsRejectZeroAmount() public {
+        vm.startPrank(escrow);
+        vm.expectRevert(RuralProducts1155.InvalidAmount.selector);
+        token.burnCompleted(buyer, LOT_ID, 0);
+
+        vm.expectRevert(RuralProducts1155.InvalidAmount.selector);
+        token.burnRefunded(buyer, LOT_ID, 0, true);
+        vm.stopPrank();
+    }
+
+    function testRetireAvailableSupplyRejectsInvalidInputs() public {
+        vm.startPrank(admin);
+        vm.expectRevert(RuralProducts1155.InvalidAmount.selector);
+        token.retireAvailableSupply(LOT_ID, 0, keccak256("reason"));
+
+        vm.expectRevert(RuralProducts1155.InvalidHash.selector);
+        token.retireAvailableSupply(LOT_ID, 1, bytes32(0));
+
+        vm.expectRevert(RuralProducts1155.LotNotFound.selector);
+        token.retireAvailableSupply(999, 1, keccak256("missing"));
+
+        vm.expectRevert(RuralProducts1155.SupplyExceeded.selector);
+        token.retireAvailableSupply(LOT_ID, MAX_SUPPLY + 1, keccak256("too-much"));
+        vm.stopPrank();
+    }
+
+    function testOnlyAdminCanCallAdminFunctions() public {
+        vm.startPrank(secondBuyer);
+        vm.expectRevert(RuralProducts1155.Unauthorized.selector);
+        token.setAdmin(secondBuyer);
+
+        vm.expectRevert(RuralProducts1155.Unauthorized.selector);
+        token.setEscrow(secondBuyer);
+
+        vm.expectRevert(RuralProducts1155.Unauthorized.selector);
+        token.setBaseURI("https://bad.example/{id}.json");
+
+        vm.expectRevert(RuralProducts1155.Unauthorized.selector);
+        token.createLot(2, producer, MAX_SUPPLY, UNIT_PRICE, metadataHash);
+
+        vm.expectRevert(RuralProducts1155.Unauthorized.selector);
+        token.setLotActive(LOT_ID, false);
+
+        vm.expectRevert(RuralProducts1155.Unauthorized.selector);
+        token.updateMetadataHash(LOT_ID, metadataHash);
+
+        vm.expectRevert(RuralProducts1155.Unauthorized.selector);
+        token.updateUnitPrice(LOT_ID, UNIT_PRICE);
+
+        vm.expectRevert(RuralProducts1155.Unauthorized.selector);
+        token.retireAvailableSupply(LOT_ID, 1, keccak256("reason"));
+        vm.stopPrank();
+    }
+
+    function testOnlyEscrowCanBurnUnits() public {
+        vm.startPrank(secondBuyer);
+        vm.expectRevert(RuralProducts1155.Unauthorized.selector);
+        token.burnCompleted(buyer, LOT_ID, 1);
+
+        vm.expectRevert(RuralProducts1155.Unauthorized.selector);
+        token.burnRefunded(buyer, LOT_ID, 1, true);
+        vm.stopPrank();
+    }
 }
