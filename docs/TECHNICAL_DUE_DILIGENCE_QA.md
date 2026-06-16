@@ -17,6 +17,10 @@ Before Arbitrum One, the privileged roles must be moved from testnet wallets to
 the selected multisig structure and the operational/legal procedures must be
 approved.
 
+Privileged-role operators must also be linked to an off-chain legal agreement
+and to on-chain evidence of acceptance of the applicable operational agreement
+version.
+
 ## What is the largest unresolved technical risk in the protocol today?
 
 The largest unresolved risk is privileged-role compromise or collusion combined
@@ -35,8 +39,9 @@ incorrect operational outcomes even if direct arbitrary withdrawals are not
 available.
 
 The remaining production controls are multisig thresholds, signer independence,
-external audit, monitoring, maximum exposure limits, and documented legal
-procedures for evidence review.
+legal agreements for privileged operators, on-chain acceptance evidence, external
+audit, monitoring, maximum exposure limits, and documented legal procedures for
+evidence review.
 
 ## Which assumptions must remain true for the system not to fail?
 
@@ -44,6 +49,8 @@ procedures for evidence review.
 - The configured USDC contract behaves as expected and remains transferable.
 - Governance, resolver, verifier, and future multisig signing keys remain
   secure.
+- Privileged-role operators are legally identified, bound by the operational
+  agreement, and revocable if they lose keys or breach duties.
 - Wiker verifies real shipment evidence honestly and within the required time.
 - Dispute resolvers do not collude with buyers or producers.
 - Producers and buyers retain access to their wallets.
